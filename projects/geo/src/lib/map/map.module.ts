@@ -10,6 +10,7 @@ import {
 import { IgoLanguageModule } from '@igo2/core';
 import { IgoConfirmDialogModule } from '@igo2/common';
 
+import { MapBrowserGlobeDirective } from './map-browser/map-browser-globe.directive';
 import { MapBrowserBindingDirective } from './map-browser/map-browser-binding.directive';
 import { MapBrowserComponent } from './map-browser/map-browser.component';
 import { ZoomButtonComponent } from './zoom-button/zoom-button.component';
@@ -29,6 +30,7 @@ import { MiniBaseMapComponent } from './baselayers-switcher/mini-basemap.compone
   exports: [
     MapBrowserComponent,
     MapBrowserBindingDirective,
+    MapBrowserGlobeDirective,
     ZoomButtonComponent,
     GeolocateButtonComponent,
     BaseLayersSwitcherComponent
@@ -36,6 +38,7 @@ import { MiniBaseMapComponent } from './baselayers-switcher/mini-basemap.compone
   declarations: [
     MapBrowserComponent,
     MapBrowserBindingDirective,
+    MapBrowserGlobeDirective,
     ZoomButtonComponent,
     GeolocateButtonComponent,
     BaseLayersSwitcherComponent,

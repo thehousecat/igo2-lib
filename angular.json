@@ -24,6 +24,11 @@
             "polyfills": "src/polyfills.ts",
             "tsConfig": "src/tsconfig.app.json",
             "assets": [
+              {
+                "glob": "**/*",
+                "input": "./node_modules/cesium/Build/Cesium",
+                "output": "./assets/cesium"
+              },
               "src/favicon.ico",
               "src/assets",
               "src/locale",
@@ -38,8 +43,11 @@
                 "output": "./assets/igo2/geo/"
               }
             ],
-            "styles": ["src/styles.scss"],
-            "scripts": []
+            "styles": [
+              "src/styles.scss",
+              "node_modules/cesium/Build/Cesium/Widgets/widgets.css"
+            ],
+            "scripts": ["node_modules/cesium/Build/Cesium/Cesium.js"]
           },
           "configurations": {
             "production": {
