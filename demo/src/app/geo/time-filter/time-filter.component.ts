@@ -1,11 +1,13 @@
-import { Component } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Subscription } from 'rxjs';
 
 import { LanguageService } from '@igo2/core';
 import {
   IgoMap,
   DataSourceService,
   LayerService,
-  TimeFilterableDataSourceOptions
+  TimeFilterableDataSourceOptions,
+  Layer
 } from '@igo2/geo';
 
 @Component({
@@ -13,7 +15,7 @@ import {
   templateUrl: './time-filter.component.html',
   styleUrls: ['./time-filter.component.scss']
 })
-export class AppTimeFilterComponent {
+export class AppTimeFilterComponent implements OnInit, OnDestroy {
   public map = new IgoMap({
     controls: {
       attribution: {
@@ -26,6 +28,9 @@ export class AppTimeFilterComponent {
     center: [-73, 47.2],
     zoom: 7
   };
+
+  private layers$$: Subscription;
+  public layers: Layer[];
 
   constructor(
     private languageService: LanguageService,
@@ -47,12 +52,13 @@ export class AppTimeFilterComponent {
 
     const datasource: TimeFilterableDataSourceOptions = {
       type: 'wms',
-      url: 'https://geoegl.msp.gouv.qc.ca/igo2/api/ws/igo_gouvouvert.fcgi',
+      url: 'https://testgeoegl.msp.gouv.qc.ca/apis/ws/igo_gouvouvert.fcgi',
       params: {
         layers: 'vg_observation_v_inondation_embacle_wmst',
         version: '1.3.0'
       },
-      timeFilterable: true,
+      optionsFromCapabilities: true
+      /*timeFilterable: true,
       timeFilter: {
         min: '2017-01-01',
         max: '2018-01-01',
@@ -61,7 +67,7 @@ export class AppTimeFilterComponent {
         style: 'slider',
         step: 86400000,
         timeInterval: 2000
-      }
+      }*/
     };
 
     this.dataSourceService
@@ -74,5 +80,15 @@ export class AppTimeFilterComponent {
           })
         );
       });
+  }
+
+  ngOnInit() {
+    this.layers$$ = this.map.layers$.subscribe(layers => {
+      this.layers = layers;
+    });
+  }
+
+  ngOnDestroy() {
+    this.layers$$.unsubscribe();
   }
 }

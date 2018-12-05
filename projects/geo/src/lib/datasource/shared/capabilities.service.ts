@@ -284,23 +284,48 @@ export class CapabilitiesService {
   }
 
   getTimeFilter(layer) {
-    let dimension;
+    const timeFilter: any = {};
 
     if (layer.Dimension) {
-      const timeFilter: any = {};
-      dimension = layer.Dimension[0];
 
-      if (dimension.values) {
-        const minMaxDim = dimension.values.split('/');
-        timeFilter.min = minMaxDim[0] !== undefined ? minMaxDim[0] : undefined;
-        timeFilter.max = minMaxDim[1] !== undefined ? minMaxDim[1] : undefined;
-        timeFilter.step = minMaxDim[2] !== undefined ? minMaxDim[2] : undefined;
-      }
+      for (const dimension of layer.Dimension) {
 
-      if (dimension.default) {
-        timeFilter.value = dimension.default;
+        if (dimension.name === 'time') {
+
+          if (dimension.values) {
+            const minMaxDim = dimension.values.split('/');
+            timeFilter.min = minMaxDim[0] !== undefined ? minMaxDim[0] : undefined;
+            timeFilter.max = minMaxDim[1] !== undefined ? minMaxDim[1] : undefined;
+            timeFilter.step = minMaxDim[2] !== undefined ? minMaxDim[2] : undefined;
+          }
+
+          if (dimension.default) {
+            timeFilter.value = dimension.default;
+          }
+
+          // Determine time filter type according to ISO 8601:2000 “extended” date format
+          if (timeFilter.min.indexOf('T') > -1 || timeFilter.step.indexOf('PT') > -1) {
+            // 'T' indicates a time is specified after a date (yyyy-mm-ddThh:mm:ss.ffffff)
+            // 'PT' indicates a time resolution smaller than a day, so use dateTime filter type
+            timeFilter.type = 'dateTime';
+            // ':' to detect a time with no preceding date (hh:mm:ss.ffffff)
+          } else if (timeFilter.min.indexOf(':') > -1) {
+            timeFilter.type = 'time';
+            // '-' to detect a date with no time, using index > 0 because a year alone could start with '-'
+            // (yyyy-mm-dd)
+          } else if (timeFilter.min.indexOf('-') > 0) {
+              timeFilter.type = 'date';
+          } else {
+            // Could be only a year
+            timeFilter.type = 'year';
+          }
+
+          timeFilter.range = true;
+
+          break;
+        }
       }
-      return timeFilter;
     }
+    return timeFilter;
   }
 }
