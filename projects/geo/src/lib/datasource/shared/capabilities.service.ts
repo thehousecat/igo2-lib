@@ -320,12 +320,19 @@ export class CapabilitiesService {
             timeFilter.type = 'year';
           }
 
-          timeFilter.range = true;
+          if (timeFilter.step) {
+            timeFilter.range = false;
+            timeFilter.style = 'slider';
+          } else {
+            timeFilter.range = true;
+            timeFilter.style = 'calendar';
+          }
 
           break;
         }
       }
     }
+
     return timeFilter;
   }
 }

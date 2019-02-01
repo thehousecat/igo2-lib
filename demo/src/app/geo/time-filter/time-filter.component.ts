@@ -1,5 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
-import { Subscription } from 'rxjs';
+import { Component } from '@angular/core';
 
 import { LanguageService } from '@igo2/core';
 import {
@@ -15,7 +14,7 @@ import {
   templateUrl: './time-filter.component.html',
   styleUrls: ['./time-filter.component.scss']
 })
-export class AppTimeFilterComponent implements OnInit, OnDestroy {
+export class AppTimeFilterComponent {
   public map = new IgoMap({
     controls: {
       attribution: {
@@ -28,9 +27,6 @@ export class AppTimeFilterComponent implements OnInit, OnDestroy {
     center: [-73, 47.2],
     zoom: 7
   };
-
-  private layers$$: Subscription;
-  public layers: Layer[];
 
   constructor(
     private languageService: LanguageService,
@@ -52,7 +48,7 @@ export class AppTimeFilterComponent implements OnInit, OnDestroy {
 
     const datasource: TimeFilterableDataSourceOptions = {
       type: 'wms',
-      url: 'https://testgeoegl.msp.gouv.qc.ca/apis/ws/igo_gouvouvert.fcgi',
+      url: 'https://geoegl.msp.gouv.qc.ca/apis/ws/igo_gouvouvert.fcgi',
       params: {
         layers: 'vg_observation_v_inondation_embacle_wmst',
         version: '1.3.0'
@@ -80,15 +76,26 @@ export class AppTimeFilterComponent implements OnInit, OnDestroy {
           })
         );
       });
-  }
 
-  ngOnInit() {
-    this.layers$$ = this.map.layers$.subscribe(layers => {
-      this.layers = layers;
-    });
-  }
+    const datasource2: TimeFilterableDataSourceOptions = {
+      type: 'wms',
+      url: 'https://geoegl.msp.gouv.qc.ca/apis/ws/geomet',
+      params: {
+        layers: 'HRDPA.6F_PR',
+        version: '1.3.0'
+      },
+      optionsFromCapabilities: true
+    };
 
-  ngOnDestroy() {
-    this.layers$$.unsubscribe();
+    this.dataSourceService
+      .createAsyncDataSource(datasource2)
+      .subscribe(dataSource => {
+        this.map.addLayer(
+          this.layerService.createLayer({
+            title: 'Quantité de précipitations',
+            source: dataSource
+          })
+        );
+      });
   }
 }

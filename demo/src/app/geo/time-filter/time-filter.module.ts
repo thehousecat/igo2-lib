@@ -1,4 +1,5 @@
 import { NgModule } from '@angular/core';
+import { CommonModule } from '@angular/common';
 import {
   MatCardModule,
   MatButtonModule,
@@ -20,7 +21,8 @@ import { AppTimeFilterRoutingModule } from './time-filter-routing.module';
     MatIconModule,
     IgoPanelModule,
     IgoMapModule,
-    IgoFilterModule
+    IgoFilterModule,
+    CommonModule
   ],
   exports: [AppTimeFilterComponent]
 })
