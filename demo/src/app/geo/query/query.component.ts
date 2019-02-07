@@ -17,6 +17,7 @@ import {
   FeatureType,
   FeatureService
 } from '@igo2/geo';
+import { QueryableDataSourceOptions } from 'projects/geo/src/lib/query/shared/query.interface';
 
 @Component({
   selector: 'app-query',
@@ -61,20 +62,61 @@ export class AppQueryComponent {
       .createAsyncDataSource({
         type: 'wms',
         url: 'https://ws.mapserver.transports.gouv.qc.ca/swtq',
+        queryFormat: 'html',
+        queryHtmlTarget: 'innerhtml',
+        params: {
+          layers: 'bgr_v_centr_servc_geomt_act',
+          version: '1.3.0'
+        }
+
+      } as QueryableDataSourceOptions)
+      .subscribe(dataSource => {
+        this.map.addLayer(
+          this.layerService.createLayer({
+            title: 'WMS - Polygon',
+            source: dataSource
+          })
+        );
+      });
+
+      this.dataSourceService
+      .createAsyncDataSource({
+        type: 'wms',
+        url: 'https://ws.mapserver.transports.gouv.qc.ca/swtq',
         params: {
           layers: 'bgr_v_sous_route_res_sup_act',
           version: '1.3.0'
         }
 
-      })
+      } as QueryableDataSourceOptions)
       .subscribe(dataSource => {
         this.map.addLayer(
           this.layerService.createLayer({
-            title: 'WMS',
+            title: 'WMS - Line',
             source: dataSource
           })
         );
       });
+     /* this.dataSourceService
+      .createAsyncDataSource({
+        type: 'wms',
+        url: 'https://ws.mapserver.transports.gouv.qc.ca/swtq',
+        queryFormat: 'html',
+        queryHtmlTarget: 'innerhtml',
+        params: {
+          layers: 'gsq_v_desc_strct_tri',
+          version: '1.3.0'
+        }
+
+      } as QueryableDataSourceOptions)
+      .subscribe(dataSource => {
+        this.map.addLayer(
+          this.layerService.createLayer({
+            title: 'WMS - Point',
+            source: dataSource
+          })
+        );
+      });*/
 
     this.dataSourceService
       .createAsyncDataSource({
@@ -133,7 +175,7 @@ export class AppQueryComponent {
   handleQueryResults(results) {
     const features: Feature[] = results.features;
     if (features.length) {
-      this.featureService.setFeatures(features);
+      this.featureService.updateFeatures(features);
     }
   }
 

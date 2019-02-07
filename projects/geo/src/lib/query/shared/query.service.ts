@@ -1,7 +1,7 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable, of } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { map, mergeMap } from 'rxjs/operators';
 
 import * as olformat from 'ol/format';
 import * as olextent from 'ol/extent';
@@ -9,6 +9,7 @@ import olFormatGML2 from 'ol/format/GML2';
 import olFormatGML3 from 'ol/format/GML3';
 import olFormatEsriJSON from 'ol/format/EsriJSON';
 import olFeature from 'ol/Feature';
+import * as olgeom from 'ol/geom';
 
 import { uuid } from '@igo2/utils';
 import { Feature } from '../../feature/shared/feature.interface';
@@ -50,18 +51,87 @@ export class QueryService {
     if (!url) {
       return of([]);
     }
-    const request = this.http.get(url, { responseType: 'text' });
-
     this.featureService.clear();
 
-    return request.pipe(map(res => this.extractData(res, layer, options, url)));
+    if ((layer.dataSource as QueryableDataSource).options.queryFormat === QueryFormat.HTML ) {
+      const url_gml = this.getQueryUrl(layer.dataSource, options, true);
+      return this.http.get(url_gml, { responseType: 'text' })
+      .pipe(mergeMap(gml_res => {
+        const imposed_geom = this.mergeGML(gml_res);
+        return this.http.get(url, { responseType: 'text' })
+        .pipe(map((res => this.extractData(res, layer, options, url, imposed_geom))));
+      }
+      ));
+    } else {
+      const request = this.http.get(url, { responseType: 'text' });
+      return request.pipe(map(res => this.extractData(res, layer, options, url)));
+    }
+
+
+  }
+
+  private mergeGML(gml_res) {
+    let parser = new olFormatGML2();
+    let features = parser.readFeatures(gml_res);
+    // Handle non standard GML output (MapServer)
+    if (features.length === 0) {
+      parser = new olformat.WMSGetFeatureInfo();
+      features = parser.readFeatures(gml_res);
+    }
+    const olmline = new olgeom.MultiLineString([]);
+    const olmpts = new olgeom.MultiPoint([]);
+    const olmpoly = new olgeom.MultiPolygon([]);
+    let firstFeatureType;
+    features.map(feature => {
+
+      if (!firstFeatureType) {
+        firstFeatureType = feature.getGeometry().getType();
+      }
+    switch (firstFeatureType) {
+      case 'LineString':
+        olmline.appendLineString(
+        new olgeom.LineString(feature.getGeometry().getCoordinates(), 'XY') );
+        break;
+      case 'Point':
+        olmpts.appendPoint(
+          new olgeom.Point(feature.getGeometry().getCoordinates(), 'XY'));
+        break;
+      case 'Polygon':
+        olmpoly.appendPolygon(
+        new olgeom.Polygon(feature.getGeometry().getCoordinates(), 'XY'));
+        break;
+      default:
+        return;
+    }
+  });
+
+  switch (firstFeatureType) {
+    case 'LineString':
+      return {
+        type: olmline.getType(),
+        coordinates: olmline.getCoordinates()
+      };
+    case 'Point':
+      return {
+        type: olmpts.getType(),
+        coordinates: olmpts.getCoordinates()
+      };
+    case 'Polygon':
+      return {
+        type: olmpoly.getType(),
+        coordinates: olmpoly.getCoordinates()
+      };
+    default:
+      return;
+  }
   }
 
   private extractData(
     res,
     layer: Layer,
     options: QueryOptions,
-    url: string
+    url: string,
+    imposedGeometry?
   ): Feature[] {
     const queryDataSource = layer.dataSource as QueryableDataSource;
 
@@ -94,7 +164,8 @@ export class QueryService {
         features = this.extractHtmlData(
           res,
           queryDataSource.queryHtmlTarget,
-          url
+          url,
+          imposedGeometry
         );
         break;
       case QueryFormat.GML2:
@@ -162,7 +233,7 @@ export class QueryService {
     return [];
   }
 
-  private extractHtmlData(res, htmlTarget, url) {
+  private extractHtmlData(res, htmlTarget, url, imposedGeometry?) {
     // _blank , modal , innerhtml or undefined
     const searchParams = this.getQueryParams(url.toLowerCase());
     const bboxRaw = searchParams['bbox'];
@@ -254,6 +325,10 @@ export class QueryService {
         }
         break;
     }
+    let geometry = { type: f.getType(), coordinates: f.getCoordinates() };
+    if (imposedGeometry) {
+      geometry = imposedGeometry;
+    }
 
     return [
       {
@@ -265,7 +340,7 @@ export class QueryService {
         icon: iconHtml,
         projection: 'EPSG:3857',
         properties: { target: targetIgo2, body: res, url: url },
-        geometry: { type: f.getType(), coordinates: f.getCoordinates() }
+        geometry: geometry
       }
     ];
   }
@@ -318,23 +393,28 @@ export class QueryService {
 
   private getQueryUrl(
     datasource: QueryableDataSource,
-    options: QueryOptions
+    options: QueryOptions,
+    forceGML2 = false
   ): string {
     let url;
     switch (datasource.constructor) {
       case WMSDataSource:
-        const wmsDatasource = datasource as WMSDataSource;
+      const wmsDatasource = datasource as WMSDataSource;
+        const WMSGetFeatureInfoOptions = {
+          INFO_FORMAT: wmsDatasource.params.info_format ||
+            this.getMimeInfoFormat(datasource.options.queryFormat),
+          QUERY_LAYERS: wmsDatasource.params.layers,
+          FEATURE_COUNT: wmsDatasource.params.feature_count || '5'
+        };
+        if (forceGML2) {
+          WMSGetFeatureInfoOptions.INFO_FORMAT =
+          this.getMimeInfoFormat(QueryFormat.GML2);
+        }
         url = wmsDatasource.ol.getGetFeatureInfoUrl(
           options.coordinates,
           options.resolution,
           options.projection,
-          {
-            INFO_FORMAT:
-              wmsDatasource.params.info_format ||
-              this.getMimeInfoFormat(datasource.options.queryFormat),
-            QUERY_LAYERS: wmsDatasource.params.layers,
-            FEATURE_COUNT: wmsDatasource.params.feature_count || '5'
-          }
+          WMSGetFeatureInfoOptions
         );
         break;
       case CartoDataSource:
