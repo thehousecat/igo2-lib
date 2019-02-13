@@ -57,7 +57,7 @@ export class QueryService {
       const url_gml = this.getQueryUrl(layer.dataSource, options, true);
       return this.http.get(url_gml, { responseType: 'text' })
       .pipe(mergeMap(gml_res => {
-        const imposed_geom = this.mergeGML(gml_res);
+        const imposed_geom = this.mergeGML(gml_res, url);
         return this.http.get(url, { responseType: 'text' })
         .pipe(map((res => this.extractData(res, layer, options, url, imposed_geom))));
       }
@@ -70,7 +70,7 @@ export class QueryService {
 
   }
 
-  private mergeGML(gml_res) {
+  private mergeGML(gml_res, url) {
     let parser = new olFormatGML2();
     let features = parser.readFeatures(gml_res);
     // Handle non standard GML output (MapServer)
@@ -79,31 +79,64 @@ export class QueryService {
       features = parser.readFeatures(gml_res);
     }
     const olmline = new olgeom.MultiLineString([]);
-    const olmpts = new olgeom.MultiPoint([]);
+    let pts;
+    const pts_array = [];
     const olmpoly = new olgeom.MultiPolygon([]);
     let firstFeatureType;
+    const nb_features = features.length;
+
+    // Check if geometry intersect bbox
+    // for geoserver getfeatureinfo response in data projection, not call projection
+    const searchParams = this.getQueryParams(url.toLowerCase());
+    const bboxRaw = searchParams['bbox'];
+    const bbox = bboxRaw.split(',');
+    const bboxExtent = olextent.createEmpty();
+    olextent.extend(bboxExtent, bbox);
+    let outBboxExtent = false;
     features.map(feature => {
 
-      if (!firstFeatureType) {
+      if (!feature.getGeometry().simplify(100).intersectsExtent(bboxExtent)) {
+        outBboxExtent = true;
+      }
+
+      if (!firstFeatureType && !outBboxExtent ) {
         firstFeatureType = feature.getGeometry().getType();
       }
-    switch (firstFeatureType) {
-      case 'LineString':
-        olmline.appendLineString(
-        new olgeom.LineString(feature.getGeometry().getCoordinates(), 'XY') );
-        break;
-      case 'Point':
-        olmpts.appendPoint(
-          new olgeom.Point(feature.getGeometry().getCoordinates(), 'XY'));
-        break;
-      case 'Polygon':
-        olmpoly.appendPolygon(
-        new olgeom.Polygon(feature.getGeometry().getCoordinates(), 'XY'));
-        break;
-      default:
-        return;
-    }
+      if (!outBboxExtent) {
+        switch (firstFeatureType) {
+          case 'LineString':
+            olmline.appendLineString(
+              new olgeom.LineString(feature.getGeometry().getCoordinates(), 'XY'));
+            break;
+          case 'Point':
+            if (nb_features === 1) {
+              pts = new olgeom.Point(feature.getGeometry().getCoordinates(), 'XY');
+            } else {
+              pts_array.push(feature.getGeometry().getCoordinates());
+            }
+            break;
+          case 'Polygon':
+            olmpoly.appendPolygon(
+              new olgeom.Polygon(feature.getGeometry().getCoordinates(), 'XY'));
+            break;
+          default:
+            return;
+        }
+      }
   });
+
+    let olmpts;
+    if (pts_array.length === 0 && pts) {
+      olmpts = {
+        type: pts.getType(),
+        coordinates: pts.getCoordinates()
+      };
+    } else {
+      olmpts = {
+        type: 'Polygon',
+        coordinates: [this.convexHull(pts_array)]
+      };
+    }
 
   switch (firstFeatureType) {
     case 'LineString':
@@ -112,10 +145,7 @@ export class QueryService {
         coordinates: olmline.getCoordinates()
       };
     case 'Point':
-      return {
-        type: olmpts.getType(),
-        coordinates: olmpts.getCoordinates()
-      };
+      return olmpts;
     case 'Polygon':
       return {
         type: olmpoly.getType(),
@@ -125,6 +155,40 @@ export class QueryService {
       return;
   }
   }
+
+  cross(a, b, o) {
+    return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+ }
+
+ /**
+  * @param points An array of [X, Y] coordinates
+  * https://en.wikibooks.org/wiki/Algorithm_Implementation/Geometry/Convex_hull/Monotone_chain#JavaScript
+  */
+ convexHull(points) {
+    points.sort(function(a, b) {
+       return a[0] === b[0] ? a[1] - b[1] : a[0] - b[0];
+    });
+
+    const lower = [];
+    for (let i = 0; i < points.length; i++) {
+       while (lower.length >= 2 && this.cross(lower[lower.length - 2], lower[lower.length - 1], points[i]) <= 0) {
+          lower.pop();
+       }
+       lower.push(points[i]);
+    }
+
+    const upper = [];
+    for (let i = points.length - 1; i >= 0; i--) {
+       while (upper.length >= 2 && this.cross(upper[upper.length - 2], upper[upper.length - 1], points[i]) <= 0) {
+          upper.pop();
+       }
+       upper.push(points[i]);
+    }
+
+    upper.pop();
+    lower.pop();
+    return lower.concat(upper);
+ }
 
   private extractData(
     res,
