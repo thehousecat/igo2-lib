@@ -66,7 +66,8 @@ export class AppQueryComponent {
         queryHtmlTarget: 'innerhtml',
         params: {
           layers: 'bgr_v_centr_servc_geomt_act',
-          version: '1.3.0'
+          version: '1.3.0',
+          feature_count: 15
         }
 
       } as QueryableDataSourceOptions)
@@ -83,9 +84,12 @@ export class AppQueryComponent {
       .createAsyncDataSource({
         type: 'wms',
         url: 'https://ws.mapserver.transports.gouv.qc.ca/swtq',
+        queryFormat: 'html',
+        queryHtmlTarget: 'innerhtml',
         params: {
           layers: 'bgr_v_sous_route_res_sup_act',
-          version: '1.3.0'
+          version: '1.3.0',
+          feature_count: 15
         }
 
       } as QueryableDataSourceOptions)
@@ -97,7 +101,7 @@ export class AppQueryComponent {
           })
         );
       });
-     /* this.dataSourceService
+    this.dataSourceService
       .createAsyncDataSource({
         type: 'wms',
         url: 'https://ws.mapserver.transports.gouv.qc.ca/swtq',
@@ -105,7 +109,8 @@ export class AppQueryComponent {
         queryHtmlTarget: 'innerhtml',
         params: {
           layers: 'gsq_v_desc_strct_tri',
-          version: '1.3.0'
+          version: '1.3.0',
+          feature_count: 15
         }
 
       } as QueryableDataSourceOptions)
@@ -116,7 +121,7 @@ export class AppQueryComponent {
             source: dataSource
           })
         );
-      });*/
+      });
 
     this.dataSourceService
       .createAsyncDataSource({
